@@ -35,7 +35,8 @@ const plans: Plan[] = [
   {
     name: 'Pro',
     price: 9,
-    priceId: 'price_pro', // Replace with your actual Stripe price ID
+    // Use an actual Stripe price ID from your account instead of the placeholder
+    priceId: 'price_1Ot9MiIiPS91xI8RDKWa3cHS',
     features: [
       { text: '25GB storage', included: true },
       { text: 'Max file size: 2GB', included: true },
@@ -47,7 +48,8 @@ const plans: Plan[] = [
   {
     name: 'Business',
     price: 29,
-    priceId: 'price_business', // Replace with your actual Stripe price ID
+    // Use an actual Stripe price ID from your account instead of the placeholder
+    priceId: 'price_1Ot9NCIiPS91xI8RZeTZh1K4',
     features: [
       { text: '100GB storage', included: true },
       { text: 'Max file size: 10GB', included: true },
@@ -74,13 +76,25 @@ export const SubscriptionManager = () => {
 
   const handleSubscribe = async (priceId: string) => {
     try {
+      // Add loading state indicator
+      toast.loading('Creating checkout session...');
+      
       const { data, error } = await supabase.functions.invoke('create-checkout', {
         body: { priceId },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error creating checkout session:', error);
+        toast.error('Failed to start checkout process');
+        throw error;
+      }
+      
       if (data?.url) {
+        toast.success('Redirecting to checkout...');
         window.location.href = data.url;
+      } else {
+        toast.error('No checkout URL returned');
+        console.error('No checkout URL returned:', data);
       }
     } catch (error) {
       console.error('Error creating checkout session:', error);
