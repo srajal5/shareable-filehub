@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Copy, Check, Share2, Link, Mail } from 'lucide-react';
 import { toast } from 'sonner';
+import { getFileById } from '@/utils/fileUtils';
 
 interface ShareModalProps {
   isOpen: boolean;
@@ -20,7 +21,8 @@ const ShareModal: React.FC<ShareModalProps> = ({ isOpen, fileId, fileName, onClo
   
   if (!fileId) return null;
   
-  const shareableLink = `${window.location.origin}/share/${fileId}`;
+  const file = getFileById(fileId);
+  const shareableLink = file?.url || '';
   
   // Copy link to clipboard
   const copyToClipboard = async () => {

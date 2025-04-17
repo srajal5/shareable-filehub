@@ -16,6 +16,7 @@ interface FileCardProps {
     type: string;
     uploadDate: Date;
     url: string;
+    path?: string;
   };
   onDelete: (fileId: string) => void;
   onShare: (fileId: string) => void;
@@ -55,16 +56,22 @@ const FileCard: React.FC<FileCardProps> = ({ file, onDelete, onShare }) => {
   };
 
   // Handle file deletion
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!user) return;
     
-    deleteFile(file.id, user.id);
-    onDelete(file.id);
-    toast.success('File deleted successfully');
+    try {
+      await deleteFile(file.id, user.id);
+      onDelete(file.id);
+      toast.success('File deleted successfully');
+    } catch (error) {
+      console.error('Error deleting file:', error);
+      toast.error('Failed to delete file');
+    }
   };
 
   // Handle file download
   const handleDownload = () => {
+    // Create a temporary link and trigger the download
     const link = document.createElement('a');
     link.href = file.url;
     link.download = file.name;
@@ -82,8 +89,7 @@ const FileCard: React.FC<FileCardProps> = ({ file, onDelete, onShare }) => {
 
   // Copy shareable link to clipboard
   const copyShareableLink = () => {
-    const shareableLink = `${window.location.origin}/share/${file.id}`;
-    navigator.clipboard.writeText(shareableLink);
+    navigator.clipboard.writeText(file.url);
     toast.success('Link copied to clipboard');
   };
 

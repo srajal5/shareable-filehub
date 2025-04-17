@@ -24,30 +24,31 @@ const FileUploader: React.FC<FileUploaderProps> = ({ onFileUploaded }) => {
     setSelectedFile(file);
   };
 
-  // Simulate file upload with progress
+  // Upload file to Supabase
   const uploadFile = async () => {
-    if (!selectedFile || !user) return;
+    if (!selectedFile || !user) {
+      toast.error('No file selected or user not logged in');
+      return;
+    }
     
     setIsUploading(true);
     setUploadProgress(0);
     
-    // Simulate upload progress
+    // Create a "fake" progress indicator since Supabase doesn't provide upload progress
     const interval = setInterval(() => {
       setUploadProgress(prev => {
-        const newProgress = prev + Math.random() * 10;
-        return newProgress >= 100 ? 100 : newProgress;
+        const newProgress = prev + Math.random() * 5;
+        return newProgress >= 95 ? 95 : newProgress;
       });
-    }, 200);
-    
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    clearInterval(interval);
-    setUploadProgress(100);
+    }, 150);
     
     try {
-      // Save the file (in a real app this would be an API call to upload)
-      const storedFile = saveFile(selectedFile, user.id);
+      // Save the file to Supabase storage
+      const storedFile = await saveFile(selectedFile, user.id);
+      
+      // Complete the progress bar
+      clearInterval(interval);
+      setUploadProgress(100);
       
       // Notify the parent component
       onFileUploaded(storedFile.id);
@@ -62,6 +63,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({ onFileUploaded }) => {
         setIsUploading(false);
       }, 500);
     } catch (error) {
+      clearInterval(interval);
       console.error('Error uploading file:', error);
       toast.error('Failed to upload file. Please try again.');
       setIsUploading(false);
@@ -111,7 +113,9 @@ const FileUploader: React.FC<FileUploaderProps> = ({ onFileUploaded }) => {
     <div className="w-full max-w-2xl mx-auto">
       {!selectedFile ? (
         <div
-          className={`file-drop-area ${isDragging ? 'dragging' : 'border-muted'}`}
+          className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer ${
+            isDragging ? 'border-primary bg-primary/5' : 'border-muted'
+          }`}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}

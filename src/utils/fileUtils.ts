@@ -1,8 +1,10 @@
 
+import { supabase } from '@/integrations/supabase/client';
+import { v4 as uuidv4 } from 'uuid';
+
 // Generate a unique ID for files
 export const generateUniqueId = (): string => {
-  return Math.random().toString(36).substring(2, 15) + 
-         Math.random().toString(36).substring(2, 15);
+  return uuidv4();
 };
 
 // Format file size
@@ -38,21 +40,63 @@ export const getFileTypeIcon = (file: File): string => {
   }
 };
 
-// Generate a sharing URL
-export const generateShareableLink = (fileId: string): string => {
-  // In a real app, this would create a proper URL based on your deployment
-  return `${window.location.origin}/share/${fileId}`;
+// Generate a sharing URL using Supabase storage URL
+export const generateShareableLink = (filePath: string): string => {
+  const { data } = supabase.storage.from('file_storage').getPublicUrl(filePath);
+  return data.publicUrl;
 };
 
-// Mock file storage (in a real app, this would interact with a database)
-interface StoredFile {
+// Save a file to Supabase storage
+export const saveFile = async (file: File, userId: string): Promise<StoredFile> => {
+  const fileId = generateUniqueId();
+  const fileExt = file.name.split('.').pop();
+  const filePath = `${userId}/${fileId}.${fileExt}`;
+  
+  const { error } = await supabase.storage
+    .from('file_storage')
+    .upload(filePath, file, {
+      cacheControl: '3600',
+      upsert: false
+    });
+  
+  if (error) {
+    throw error;
+  }
+  
+  // Get the public URL for the uploaded file
+  const { data } = supabase.storage.from('file_storage').getPublicUrl(filePath);
+  
+  // Store file metadata in localStorage for this example
+  // In a real app, you might want to store this in a database table
+  const storedFile: StoredFile = {
+    id: fileId,
+    name: file.name,
+    size: file.size,
+    type: file.type,
+    uploadDate: new Date(),
+    url: data.publicUrl,
+    userId,
+    path: filePath
+  };
+  
+  // Store file metadata in localStorage (for compatibility with existing code)
+  const files = getStoredFiles(userId);
+  files.push(storedFile);
+  localStorage.setItem(`files_${userId}`, JSON.stringify(files));
+  
+  return storedFile;
+};
+
+// Interface for stored file metadata
+export interface StoredFile {
   id: string;
   name: string;
   size: number;
   type: string;
   uploadDate: Date;
-  url: string; // In a real app, this would be a URL to the stored file
+  url: string;
   userId: string;
+  path?: string; // Supabase storage path
 }
 
 // Get stored files from localStorage
@@ -61,30 +105,23 @@ export const getStoredFiles = (userId: string): StoredFile[] => {
   return filesJson ? JSON.parse(filesJson) : [];
 };
 
-// Save a file to "storage" (localStorage in this mock)
-export const saveFile = (file: File, userId: string): StoredFile => {
-  const fileId = generateUniqueId();
+// Delete a file from Supabase storage
+export const deleteFile = async (fileId: string, userId: string): Promise<void> => {
   const files = getStoredFiles(userId);
+  const fileToDelete = files.find(file => file.id === fileId);
   
-  const storedFile: StoredFile = {
-    id: fileId,
-    name: file.name,
-    size: file.size,
-    type: file.type,
-    uploadDate: new Date(),
-    url: URL.createObjectURL(file), // In a real app, this would be a server URL
-    userId,
-  };
+  if (fileToDelete?.path) {
+    // Delete from Supabase storage
+    const { error } = await supabase.storage
+      .from('file_storage')
+      .remove([fileToDelete.path]);
+    
+    if (error) {
+      throw error;
+    }
+  }
   
-  files.push(storedFile);
-  localStorage.setItem(`files_${userId}`, JSON.stringify(files));
-  
-  return storedFile;
-};
-
-// Delete a file
-export const deleteFile = (fileId: string, userId: string): void => {
-  const files = getStoredFiles(userId);
+  // Update localStorage
   const updatedFiles = files.filter(file => file.id !== fileId);
   localStorage.setItem(`files_${userId}`, JSON.stringify(updatedFiles));
 };
