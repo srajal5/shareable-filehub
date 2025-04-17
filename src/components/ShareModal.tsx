@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Copy, Check, Share2, Link, Mail } from 'lucide-react';
+import { Copy, Check, Share2, Link as LinkIcon, Mail } from 'lucide-react';
 import { toast } from 'sonner';
 import { getFileById } from '@/utils/fileUtils';
 
@@ -71,7 +71,7 @@ const ShareModal: React.FC<ShareModalProps> = ({ isOpen, fileId, fileName, onClo
             <Label htmlFor="link">Shareable Link</Label>
             <div className="flex items-center space-x-2">
               <div className="relative flex-1">
-                <Link className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <LinkIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input 
                   id="link" 
                   value={shareableLink} 
