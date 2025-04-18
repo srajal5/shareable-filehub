@@ -1,12 +1,21 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { CheckCircle, Loader2 } from 'lucide-react';
+import { CheckCircle, Loader2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogClose
+} from '@/components/ui/dialog';
 
 interface PlanFeature {
   text: string;
@@ -20,6 +29,7 @@ interface Plan {
   features: PlanFeature[];
 }
 
+// Note: These are placeholder price IDs - you need to replace them with real ones from your Stripe dashboard
 const plans: Plan[] = [
   {
     name: 'Free',
@@ -35,8 +45,8 @@ const plans: Plan[] = [
   {
     name: 'Pro',
     price: 9,
-    // Use an actual Stripe price ID from your account instead of the placeholder
-    priceId: 'price_1REyaMPNfJ80mrTVkBVAISUa',
+    // Replace with your actual Stripe price ID from your Stripe dashboard
+    priceId: 'price_example_pro', // ⚠️ REPLACE THIS with your actual Pro plan price ID
     features: [
       { text: '25GB storage', included: true },
       { text: 'Max file size: 2GB', included: true },
@@ -48,8 +58,8 @@ const plans: Plan[] = [
   {
     name: 'Business',
     price: 29,
-    // Use an actual Stripe price ID from your account instead of the placeholder
-    priceId: 'price_1REyayPNfJ80mrTVi062BwXm',
+    // Replace with your actual Stripe price ID from your Stripe dashboard
+    priceId: 'price_example_business', // ⚠️ REPLACE THIS with your actual Business plan price ID
     features: [
       { text: '100GB storage', included: true },
       { text: 'Max file size: 10GB', included: true },
@@ -63,8 +73,11 @@ const plans: Plan[] = [
 
 export const SubscriptionManager = () => {
   const { user } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorDetails, setErrorDetails] = useState<string | null>(null);
+  const [showErrorDialog, setShowErrorDialog] = useState(false);
 
-  const { data: subscription, isLoading } = useQuery({
+  const { data: subscription, isLoading: isSubscriptionLoading } = useQuery({
     queryKey: ['subscription'],
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke('check-subscription');
@@ -76,6 +89,7 @@ export const SubscriptionManager = () => {
 
   const handleSubscribe = async (priceId: string) => {
     try {
+      setIsLoading(true);
       // Add loading state indicator
       toast.loading('Creating checkout session...');
       
@@ -85,6 +99,8 @@ export const SubscriptionManager = () => {
 
       if (error) {
         console.error('Error creating checkout session:', error);
+        setErrorDetails(JSON.stringify(error, null, 2));
+        setShowErrorDialog(true);
         toast.error('Failed to start checkout process');
         throw error;
       }
@@ -93,16 +109,28 @@ export const SubscriptionManager = () => {
         toast.success('Redirecting to checkout...');
         window.location.href = data.url;
       } else {
-        toast.error('No checkout URL returned');
-        console.error('No checkout URL returned:', data);
+        const errorMsg = 'No checkout URL returned';
+        setErrorDetails(JSON.stringify(data, null, 2));
+        setShowErrorDialog(true);
+        toast.error(errorMsg);
+        console.error(errorMsg, data);
       }
     } catch (error) {
       console.error('Error creating checkout session:', error);
+      // Save detailed error information
+      if (error instanceof Error) {
+        setErrorDetails(JSON.stringify(error, null, 2));
+      } else {
+        setErrorDetails(String(error));
+      }
+      setShowErrorDialog(true);
       toast.error('Failed to start checkout process');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  if (isLoading) {
+  if (isSubscriptionLoading) {
     return (
       <div className="flex justify-center items-center min-h-[200px]">
         <Loader2 className="h-8 w-8 animate-spin" />
@@ -117,6 +145,14 @@ export const SubscriptionManager = () => {
         <p className="text-muted-foreground">
           Select the plan that best fits your needs
         </p>
+        <div className="mt-4 max-w-xl mx-auto bg-amber-50 border border-amber-200 p-4 rounded-md">
+          <div className="flex gap-2 items-start">
+            <AlertCircle className="h-5 w-5 text-amber-500 mt-0.5 flex-shrink-0" />
+            <p className="text-sm text-amber-800 text-left">
+              <strong>Important:</strong> This is a demonstration. Before using, replace the placeholder price IDs in the code with your actual Stripe price IDs from your Stripe dashboard.
+            </p>
+          </div>
+        </div>
       </div>
 
       <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
@@ -147,14 +183,43 @@ export const SubscriptionManager = () => {
               <Button
                 className="w-full"
                 onClick={() => plan.priceId && handleSubscribe(plan.priceId)}
-                disabled={!plan.priceId}
+                disabled={!plan.priceId || isLoading}
               >
-                {plan.price === 0 ? 'Get Started' : 'Subscribe'}
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  plan.price === 0 ? 'Get Started' : 'Subscribe'
+                )}
               </Button>
             )}
           </Card>
         ))}
       </div>
+
+      {/* Error Details Dialog */}
+      <Dialog open={showErrorDialog} onOpenChange={setShowErrorDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Checkout Error Details</DialogTitle>
+            <DialogDescription>
+              There was an error processing your checkout request. Please share these details with support:
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="mt-4 bg-gray-100 p-4 rounded-md overflow-auto max-h-[300px]">
+            <pre className="text-xs whitespace-pre-wrap break-words">{errorDetails}</pre>
+          </div>
+          
+          <DialogFooter className="mt-4">
+            <DialogClose asChild>
+              <Button>Close</Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
