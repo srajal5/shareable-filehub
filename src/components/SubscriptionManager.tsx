@@ -36,7 +36,7 @@ const plans: Plan[] = [
     name: 'Pro',
     price: 9,
     // Use an actual Stripe price ID from your account instead of the placeholder
-    priceId: 'prod_S9H8BVplPvSOj3',
+    priceId: 'price_1REyaMPNfJ80mrTVkBVAISUa',
     features: [
       { text: '25GB storage', included: true },
       { text: 'Max file size: 2GB', included: true },
@@ -49,7 +49,7 @@ const plans: Plan[] = [
     name: 'Business',
     price: 29,
     // Use an actual Stripe price ID from your account instead of the placeholder
-    priceId: 'prod_S9H9XD02SowFLx',
+    priceId: 'price_1REyayPNfJ80mrTVi062BwXm',
     features: [
       { text: '100GB storage', included: true },
       { text: 'Max file size: 10GB', included: true },
