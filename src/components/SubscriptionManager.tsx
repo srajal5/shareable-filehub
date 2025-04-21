@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -45,8 +44,8 @@ const plans: Plan[] = [
   {
     name: 'Pro',
     price: 9,
-    // Replace with your actual Stripe price ID from your Stripe dashboard
-    priceId: 'price_example_pro', // ⚠️ REPLACE THIS with your actual Pro plan price ID
+    // Original price ID for the Pro product
+    priceId: 'price_1REyaMPNfJ80mrTVkBVAISUa',
     features: [
       { text: '25GB storage', included: true },
       { text: 'Max file size: 2GB', included: true },
@@ -58,8 +57,8 @@ const plans: Plan[] = [
   {
     name: 'Business',
     price: 29,
-    // Replace with your actual Stripe price ID from your Stripe dashboard
-    priceId: 'price_example_business', // ⚠️ REPLACE THIS with your actual Business plan price ID
+    // Original price ID for the Business plan
+    priceId: 'price_1REyayPNfJ80mrTVi062BwXm',
     features: [
       { text: '100GB storage', included: true },
       { text: 'Max file size: 10GB', included: true },
