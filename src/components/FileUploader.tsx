@@ -66,8 +66,9 @@ const FileUploader: React.FC<FileUploaderProps> = ({ onFileUploaded }) => {
       }, 500);
     } catch (error) {
       console.error('Error uploading file:', error);
-      setError(error instanceof Error ? error.message : 'Failed to upload file');
-      toast.error('Failed to upload file. Please try again.');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to upload file';
+      setError(errorMessage);
+      toast.error(errorMessage);
       setIsUploading(false);
     }
   };

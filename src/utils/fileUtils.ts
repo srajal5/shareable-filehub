@@ -65,13 +65,13 @@ export const saveFile = async (
     const filePath = `${userId}/${fileId}.${fileExt}`;
     
     if (onProgress) {
-      onProgress(10);
+      onProgress(15);
     }
     
     console.log(`Uploading file to path: ${filePath}`);
     
-    // Upload the file
-    const { error: uploadError, data } = await supabase.storage
+    // Upload the file - we'll use a simplified approach without bucket checks
+    const { error: uploadError } = await supabase.storage
       .from('file_storage')
       .upload(filePath, file, {
         cacheControl: '3600',
@@ -80,7 +80,7 @@ export const saveFile = async (
     
     if (uploadError) {
       console.error('Upload error:', uploadError);
-      throw uploadError;
+      throw new Error(`Failed to upload file: ${uploadError.message}`);
     }
     
     console.log('File uploaded successfully');
@@ -165,6 +165,7 @@ export const deleteFile = async (fileId: string, userId: string): Promise<void> 
       .remove([fileToDelete.path]);
     
     if (error) {
+      console.error('Error deleting file from storage:', error);
       throw error;
     }
   }
