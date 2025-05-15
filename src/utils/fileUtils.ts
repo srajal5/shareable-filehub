@@ -46,31 +46,21 @@ export const generateShareableLink = (filePath: string): string => {
   return data.publicUrl;
 };
 
-// Helper function to create storage bucket if it doesn't exist
-export const ensureStorageBucket = async (): Promise<boolean> => {
+// Check if the storage bucket exists (no creation attempt)
+export const checkStorageBucket = async (): Promise<boolean> => {
   try {
     // Check if bucket exists by trying to get its details
     const { data: buckets } = await supabase.storage.listBuckets();
     const bucketExists = buckets?.some(b => b.name === 'file_storage');
     
     if (!bucketExists) {
-      console.log('Storage bucket does not exist, creating...');
-      // Bucket doesn't exist yet, create it
-      const { error } = await supabase.storage.createBucket('file_storage', {
-        public: true,
-        fileSizeLimit: 50000000, // 50MB limit
-      });
-      
-      if (error) {
-        console.error('Error creating storage bucket:', error);
-        return false;
-      }
-      console.log('Storage bucket created successfully');
+      console.error('Storage bucket "file_storage" does not exist. Please create it in the Supabase dashboard.');
+      return false;
     }
     
     return true;
   } catch (error) {
-    console.error('Error checking/creating bucket:', error);
+    console.error('Error checking storage bucket:', error);
     return false;
   }
 };
@@ -81,10 +71,10 @@ export const saveFile = async (
   userId: string,
   onProgress?: (progress: number) => void
 ): Promise<StoredFile> => {
-  // Ensure storage bucket exists
-  const bucketReady = await ensureStorageBucket();
+  // Check that storage bucket exists
+  const bucketReady = await checkStorageBucket();
   if (!bucketReady) {
-    throw new Error('Could not create or access storage bucket');
+    throw new Error('Could not access storage bucket. Please ensure it exists in Supabase.');
   }
   
   const fileId = generateUniqueId();
@@ -100,7 +90,7 @@ export const saveFile = async (
     console.log(`Uploading file: ${file.name} (${file.size} bytes)`);
     
     // Upload the file
-    const { error: uploadError } = await supabase.storage
+    const { error: uploadError, data } = await supabase.storage
       .from('file_storage')
       .upload(filePath, file, {
         cacheControl: '3600',
