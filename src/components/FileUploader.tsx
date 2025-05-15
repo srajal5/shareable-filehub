@@ -24,7 +24,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({ onFileUploaded }) => {
     setSelectedFile(file);
   };
 
-  // Upload file to Supabase
+  // Upload file to Supabase with real progress tracking
   const uploadFile = async () => {
     if (!selectedFile || !user) {
       toast.error('No file selected or user not logged in');
@@ -34,21 +34,16 @@ const FileUploader: React.FC<FileUploaderProps> = ({ onFileUploaded }) => {
     setIsUploading(true);
     setUploadProgress(0);
     
-    // Create a "fake" progress indicator since Supabase doesn't provide upload progress
-    const interval = setInterval(() => {
-      setUploadProgress(prev => {
-        const newProgress = prev + Math.random() * 5;
-        return newProgress >= 95 ? 95 : newProgress;
-      });
-    }, 150);
-    
     try {
-      // Save the file to Supabase storage
-      const storedFile = await saveFile(selectedFile, user.id);
-      
-      // Complete the progress bar
-      clearInterval(interval);
-      setUploadProgress(100);
+      // Using the updated saveFile function with progress callback
+      const storedFile = await saveFile(
+        selectedFile,
+        user.id,
+        (progress) => {
+          // Update progress with real-time feedback
+          setUploadProgress(progress);
+        }
+      );
       
       // Notify the parent component
       onFileUploaded(storedFile.id);
@@ -63,7 +58,6 @@ const FileUploader: React.FC<FileUploaderProps> = ({ onFileUploaded }) => {
         setIsUploading(false);
       }, 500);
     } catch (error) {
-      clearInterval(interval);
       console.error('Error uploading file:', error);
       toast.error('Failed to upload file. Please try again.');
       setIsUploading(false);

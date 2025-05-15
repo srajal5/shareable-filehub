@@ -46,17 +46,31 @@ export const generateShareableLink = (filePath: string): string => {
   return data.publicUrl;
 };
 
-// Save a file to Supabase storage
-export const saveFile = async (file: File, userId: string): Promise<StoredFile> => {
+// Save a file to Supabase storage with progress tracking
+export const saveFile = async (
+  file: File, 
+  userId: string,
+  onProgress?: (progress: number) => void
+): Promise<StoredFile> => {
   const fileId = generateUniqueId();
   const fileExt = file.name.split('.').pop();
   const filePath = `${userId}/${fileId}.${fileExt}`;
   
-  const { error } = await supabase.storage
+  // Create blob for upload and track progress
+  const fileBlob = file.slice(0, file.size, file.type);
+  
+  // Create and track upload
+  const { error, data } = await supabase.storage
     .from('file_storage')
-    .upload(filePath, file, {
+    .upload(filePath, fileBlob, {
       cacheControl: '3600',
-      upsert: false
+      upsert: false,
+      onUploadProgress: (progress) => {
+        const progressPercent = (progress.loaded / progress.total) * 100;
+        if (onProgress) {
+          onProgress(progressPercent);
+        }
+      }
     });
   
   if (error) {
@@ -64,7 +78,7 @@ export const saveFile = async (file: File, userId: string): Promise<StoredFile> 
   }
   
   // Get the public URL for the uploaded file
-  const { data } = supabase.storage.from('file_storage').getPublicUrl(filePath);
+  const { data: urlData } = supabase.storage.from('file_storage').getPublicUrl(filePath);
   
   // Store file metadata in localStorage for this example
   // In a real app, you might want to store this in a database table
@@ -74,7 +88,7 @@ export const saveFile = async (file: File, userId: string): Promise<StoredFile> 
     size: file.size,
     type: file.type,
     uploadDate: new Date(),
-    url: data.publicUrl,
+    url: urlData.publicUrl,
     userId,
     path: filePath
   };
