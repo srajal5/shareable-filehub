@@ -46,81 +46,115 @@ export const generateShareableLink = (filePath: string): string => {
   return data.publicUrl;
 };
 
+// Helper function to create storage bucket if it doesn't exist
+export const ensureStorageBucket = async (): Promise<boolean> => {
+  try {
+    // Check if bucket exists by trying to get its details
+    const { data: buckets } = await supabase.storage.listBuckets();
+    const bucketExists = buckets?.some(b => b.name === 'file_storage');
+    
+    if (!bucketExists) {
+      console.log('Storage bucket does not exist, creating...');
+      // Bucket doesn't exist yet, create it
+      const { error } = await supabase.storage.createBucket('file_storage', {
+        public: true,
+        fileSizeLimit: 50000000, // 50MB limit
+      });
+      
+      if (error) {
+        console.error('Error creating storage bucket:', error);
+        return false;
+      }
+      console.log('Storage bucket created successfully');
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Error checking/creating bucket:', error);
+    return false;
+  }
+};
+
 // Save a file to Supabase storage with progress tracking
 export const saveFile = async (
   file: File, 
   userId: string,
   onProgress?: (progress: number) => void
 ): Promise<StoredFile> => {
+  // Ensure storage bucket exists
+  const bucketReady = await ensureStorageBucket();
+  if (!bucketReady) {
+    throw new Error('Could not create or access storage bucket');
+  }
+  
   const fileId = generateUniqueId();
   const fileExt = file.name.split('.').pop();
   const filePath = `${userId}/${fileId}.${fileExt}`;
   
-  // Since onUploadProgress is not available in the FileOptions type,
-  // we need to track progress differently
-  
-  // For large files, use a chunk-based approach to track progress
-  if (file.size > 100000 && onProgress) {
-    // First notify about the start of the upload
-    onProgress(0);
+  try {
+    // Start progress reporting
+    if (onProgress) {
+      onProgress(0);
+    }
+    
+    console.log(`Uploading file: ${file.name} (${file.size} bytes)`);
     
     // Upload the file
-    const { error, data } = await supabase.storage
+    const { error: uploadError } = await supabase.storage
       .from('file_storage')
       .upload(filePath, file, {
         cacheControl: '3600',
         upsert: false
       });
     
-    if (error) {
-      throw error;
+    if (uploadError) {
+      console.error('Upload error:', uploadError);
+      throw uploadError;
     }
     
-    // Immediately notify about completion
-    if (onProgress) {
-      onProgress(100);
-    }
-  } else {
-    // For smaller files or when progress isn't needed, use direct upload
-    const { error, data } = await supabase.storage
+    console.log('File uploaded successfully');
+    
+    // Get the public URL for the uploaded file
+    const { data: urlData } = supabase.storage
       .from('file_storage')
-      .upload(filePath, file, {
-        cacheControl: '3600',
-        upsert: false
-      });
+      .getPublicUrl(filePath);
     
-    if (error) {
-      throw error;
+    if (!urlData || !urlData.publicUrl) {
+      throw new Error('Failed to get public URL for uploaded file');
     }
     
-    // If there's a progress callback, notify completion
+    // Complete progress reporting
     if (onProgress) {
       onProgress(100);
     }
+    
+    // Store file metadata in localStorage for this example
+    // In a real app, you might want to store this in a database table
+    const storedFile: StoredFile = {
+      id: fileId,
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      uploadDate: new Date(),
+      url: urlData.publicUrl,
+      userId,
+      path: filePath
+    };
+    
+    // Store file metadata in localStorage (for compatibility with existing code)
+    const files = getStoredFiles(userId);
+    files.push(storedFile);
+    localStorage.setItem(`files_${userId}`, JSON.stringify(files));
+    
+    return storedFile;
+  } catch (error) {
+    console.error('Error in saveFile:', error);
+    // Ensure we reset the progress in case of error
+    if (onProgress) {
+      onProgress(0);
+    }
+    throw error;
   }
-  
-  // Get the public URL for the uploaded file
-  const { data: urlData } = supabase.storage.from('file_storage').getPublicUrl(filePath);
-  
-  // Store file metadata in localStorage for this example
-  // In a real app, you might want to store this in a database table
-  const storedFile: StoredFile = {
-    id: fileId,
-    name: file.name,
-    size: file.size,
-    type: file.type,
-    uploadDate: new Date(),
-    url: urlData.publicUrl,
-    userId,
-    path: filePath
-  };
-  
-  // Store file metadata in localStorage (for compatibility with existing code)
-  const files = getStoredFiles(userId);
-  files.push(storedFile);
-  localStorage.setItem(`files_${userId}`, JSON.stringify(files));
-  
-  return storedFile;
 };
 
 // Interface for stored file metadata

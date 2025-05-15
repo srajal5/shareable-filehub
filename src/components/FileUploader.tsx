@@ -16,12 +16,14 @@ const FileUploader: React.FC<FileUploaderProps> = ({ onFileUploaded }) => {
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = React.useState(0);
   const [isUploading, setIsUploading] = React.useState(false);
+  const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
 
   // Handle file selection
   const handleFileSelect = (file: File) => {
     setSelectedFile(file);
+    setError(null);
   };
 
   // Upload file to Supabase
@@ -33,17 +35,22 @@ const FileUploader: React.FC<FileUploaderProps> = ({ onFileUploaded }) => {
     
     setIsUploading(true);
     setUploadProgress(0);
+    setError(null);
     
     try {
+      console.log(`Starting upload for file: ${selectedFile.name}`);
+      
       // Using the updated saveFile function with progress callback
       const storedFile = await saveFile(
         selectedFile,
         user.id,
         (progress) => {
-          // Update progress with simulated or real-time feedback
+          console.log(`Upload progress: ${progress}%`);
           setUploadProgress(progress);
         }
       );
+      
+      console.log('Upload completed successfully:', storedFile);
       
       // Notify the parent component
       onFileUploaded(storedFile.id);
@@ -59,6 +66,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({ onFileUploaded }) => {
       }, 500);
     } catch (error) {
       console.error('Error uploading file:', error);
+      setError(error instanceof Error ? error.message : 'Failed to upload file');
       toast.error('Failed to upload file. Please try again.');
       setIsUploading(false);
     }
@@ -101,6 +109,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({ onFileUploaded }) => {
   // Remove selected file
   const removeSelectedFile = () => {
     setSelectedFile(null);
+    setError(null);
   };
 
   return (
@@ -157,6 +166,12 @@ const FileUploader: React.FC<FileUploaderProps> = ({ onFileUploaded }) => {
               </Button>
             )}
           </div>
+          
+          {error && (
+            <div className="mb-4 p-3 bg-destructive/10 text-destructive rounded-md text-sm">
+              {error}
+            </div>
+          )}
           
           {isUploading ? (
             <div className="space-y-2">
