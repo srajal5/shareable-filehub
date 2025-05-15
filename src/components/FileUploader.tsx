@@ -24,7 +24,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({ onFileUploaded }) => {
     setSelectedFile(file);
   };
 
-  // Upload file to Supabase with real progress tracking
+  // Upload file to Supabase
   const uploadFile = async () => {
     if (!selectedFile || !user) {
       toast.error('No file selected or user not logged in');
@@ -40,7 +40,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({ onFileUploaded }) => {
         selectedFile,
         user.id,
         (progress) => {
-          // Update progress with real-time feedback
+          // Update progress with simulated or real-time feedback
           setUploadProgress(progress);
         }
       );

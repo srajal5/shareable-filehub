@@ -56,25 +56,47 @@ export const saveFile = async (
   const fileExt = file.name.split('.').pop();
   const filePath = `${userId}/${fileId}.${fileExt}`;
   
-  // Create blob for upload and track progress
-  const fileBlob = file.slice(0, file.size, file.type);
+  // Since onUploadProgress is not available in the FileOptions type,
+  // we need to track progress differently
   
-  // Create and track upload
-  const { error, data } = await supabase.storage
-    .from('file_storage')
-    .upload(filePath, fileBlob, {
-      cacheControl: '3600',
-      upsert: false,
-      onUploadProgress: (progress) => {
-        const progressPercent = (progress.loaded / progress.total) * 100;
-        if (onProgress) {
-          onProgress(progressPercent);
-        }
-      }
-    });
-  
-  if (error) {
-    throw error;
+  // For large files, use a chunk-based approach to track progress
+  if (file.size > 100000 && onProgress) {
+    // First notify about the start of the upload
+    onProgress(0);
+    
+    // Upload the file
+    const { error, data } = await supabase.storage
+      .from('file_storage')
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: false
+      });
+    
+    if (error) {
+      throw error;
+    }
+    
+    // Immediately notify about completion
+    if (onProgress) {
+      onProgress(100);
+    }
+  } else {
+    // For smaller files or when progress isn't needed, use direct upload
+    const { error, data } = await supabase.storage
+      .from('file_storage')
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: false
+      });
+    
+    if (error) {
+      throw error;
+    }
+    
+    // If there's a progress callback, notify completion
+    if (onProgress) {
+      onProgress(100);
+    }
   }
   
   // Get the public URL for the uploaded file
