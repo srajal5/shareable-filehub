@@ -1,12 +1,12 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Copy, Check, Share2, Link as LinkIcon, Mail } from 'lucide-react';
 import { toast } from 'sonner';
-import { getFileById } from '@/utils/fileUtils';
+import { getFileById, generateShareableLink } from '@/utils/fileUtils';
 
 interface ShareModalProps {
   isOpen: boolean;
@@ -18,11 +18,36 @@ interface ShareModalProps {
 const ShareModal: React.FC<ShareModalProps> = ({ isOpen, fileId, fileName, onClose }) => {
   const [copied, setCopied] = useState(false);
   const [email, setEmail] = useState('');
+  const [shareableLink, setShareableLink] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   
-  if (!fileId) return null;
-  
-  const file = getFileById(fileId);
-  const shareableLink = file?.url || '';
+  useEffect(() => {
+    const getShareableLink = async () => {
+      if (!fileId) return;
+      
+      setIsLoading(true);
+      
+      try {
+        const file = getFileById(fileId);
+        if (file) {
+          const link = await generateShareableLink(file.path || '', file.localUrl);
+          setShareableLink(link);
+        } else {
+          setShareableLink('File not found');
+        }
+      } catch (error) {
+        console.error("Error generating shareable link:", error);
+        setShareableLink('Error generating link');
+        toast.error("Couldn't generate shareable link");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    if (isOpen && fileId) {
+      getShareableLink();
+    }
+  }, [fileId, isOpen]);
   
   // Copy link to clipboard
   const copyToClipboard = async () => {
@@ -74,7 +99,7 @@ const ShareModal: React.FC<ShareModalProps> = ({ isOpen, fileId, fileName, onClo
                 <LinkIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input 
                   id="link" 
-                  value={shareableLink} 
+                  value={isLoading ? "Generating link..." : shareableLink} 
                   readOnly 
                   className="pl-9 pr-20 text-sm truncate"
                 />
@@ -84,6 +109,7 @@ const ShareModal: React.FC<ShareModalProps> = ({ isOpen, fileId, fileName, onClo
                   size="sm"
                   className="absolute right-1 top-1/2 transform -translate-y-1/2 h-7"
                   onClick={copyToClipboard}
+                  disabled={isLoading}
                 >
                   {copied ? (
                     <>
@@ -126,7 +152,7 @@ const ShareModal: React.FC<ShareModalProps> = ({ isOpen, fileId, fileName, onClo
           <Button variant="outline" onClick={onClose}>
             Close
           </Button>
-          <Button type="button" onClick={copyToClipboard}>
+          <Button type="button" onClick={copyToClipboard} disabled={isLoading}>
             {copied ? 'Copied!' : 'Copy Link'}
           </Button>
         </DialogFooter>

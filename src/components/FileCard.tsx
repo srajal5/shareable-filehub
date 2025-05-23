@@ -5,7 +5,7 @@ import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Copy, Download, File, FileImage, FileText, FileVideo, FileAudio, Link, MoreVertical, Share2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { formatFileSize, deleteFile } from '@/utils/fileUtils';
+import { formatFileSize, deleteFile, downloadFile } from '@/utils/fileUtils';
 import { useAuth } from '@/context/AuthContext';
 
 interface FileCardProps {
@@ -17,6 +17,7 @@ interface FileCardProps {
     uploadDate: Date;
     url: string;
     path?: string;
+    localUrl?: string;
   };
   onDelete: (fileId: string) => void;
   onShare: (fileId: string) => void;
@@ -70,16 +71,14 @@ const FileCard: React.FC<FileCardProps> = ({ file, onDelete, onShare }) => {
   };
 
   // Handle file download
-  const handleDownload = () => {
-    // Create a temporary link and trigger the download
-    const link = document.createElement('a');
-    link.href = file.url;
-    link.download = file.name;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    toast.success('Download started');
+  const handleDownload = async () => {
+    try {
+      await downloadFile(file.id);
+      toast.success('Download started');
+    } catch (error) {
+      console.error('Error downloading file:', error);
+      toast.error('Failed to download file');
+    }
   };
 
   // Handle file sharing

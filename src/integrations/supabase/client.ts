@@ -15,3 +15,18 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     autoRefreshToken: true,
   }
 });
+
+// Check if the bucket exists
+export const checkBucketExists = async (bucketName: string): Promise<boolean> => {
+  try {
+    const { data, error } = await supabase.storage.getBucket(bucketName);
+    if (error) {
+      console.error(`Storage bucket "${bucketName}" does not exist or not accessible with current permissions`);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error(`Error checking bucket existence:`, error);
+    return false;
+  }
+};
