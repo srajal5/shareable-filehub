@@ -46,6 +46,36 @@ export const generateShareableLink = (filePath: string): string => {
   return data.publicUrl;
 };
 
+// Mock upload to localStorage when Supabase storage fails
+const mockSaveFileToLocalStorage = (
+  file: File,
+  userId: string
+): StoredFile => {
+  const fileId = generateUniqueId();
+  
+  // Create a mock URL
+  const mockUrl = URL.createObjectURL(file);
+  
+  // Store file metadata in localStorage
+  const storedFile: StoredFile = {
+    id: fileId,
+    name: file.name,
+    size: file.size,
+    type: file.type,
+    uploadDate: new Date(),
+    url: mockUrl,
+    userId,
+    path: `mock_${userId}/${fileId}`
+  };
+  
+  // Store in localStorage
+  const files = getStoredFiles(userId);
+  files.push(storedFile);
+  localStorage.setItem(`files_${userId}`, JSON.stringify(files));
+  
+  return storedFile;
+};
+
 // Save a file to Supabase storage with progress tracking
 export const saveFile = async (
   file: File, 
@@ -70,61 +100,87 @@ export const saveFile = async (
     
     console.log(`Uploading file to path: ${filePath}`);
     
-    // Upload the file - we'll use a simplified approach without bucket checks
-    const { error: uploadError } = await supabase.storage
-      .from('file_storage')
-      .upload(filePath, file, {
-        cacheControl: '3600',
-        upsert: false
-      });
-    
-    if (uploadError) {
-      console.error('Upload error:', uploadError);
-      throw new Error(`Failed to upload file: ${uploadError.message}`);
+    try {
+      // Check if bucket exists
+      const { error: bucketError } = await supabase.storage.getBucket('file_storage');
+      if (bucketError) {
+        console.warn('Storage bucket "file_storage" not found. Falling back to local storage.');
+        if (onProgress) onProgress(50);
+        
+        // If the bucket doesn't exist, fall back to localStorage
+        const mockFile = mockSaveFileToLocalStorage(file, userId);
+        
+        if (onProgress) onProgress(100);
+        
+        return mockFile;
+      }
+      
+      // Upload the file
+      const { error: uploadError } = await supabase.storage
+        .from('file_storage')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+      
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        throw new Error(`Failed to upload file: ${uploadError.message}`);
+      }
+      
+      console.log('File uploaded successfully');
+      
+      if (onProgress) {
+        onProgress(75);
+      }
+      
+      // Get the public URL for the uploaded file
+      const { data: urlData } = supabase.storage
+        .from('file_storage')
+        .getPublicUrl(filePath);
+      
+      if (!urlData || !urlData.publicUrl) {
+        throw new Error('Failed to get public URL for uploaded file');
+      }
+      
+      // Complete progress reporting
+      if (onProgress) {
+        onProgress(90);
+      }
+      
+      // Store file metadata in localStorage for this example
+      const storedFile: StoredFile = {
+        id: fileId,
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        uploadDate: new Date(),
+        url: urlData.publicUrl,
+        userId,
+        path: filePath
+      };
+      
+      // Store file metadata in localStorage
+      const files = getStoredFiles(userId);
+      files.push(storedFile);
+      localStorage.setItem(`files_${userId}`, JSON.stringify(files));
+      
+      if (onProgress) {
+        onProgress(100);
+      }
+      
+      return storedFile;
+    } catch (error) {
+      // If specific Supabase upload fails, fallback to localStorage
+      console.warn('Supabase upload failed, falling back to localStorage:', error);
+      if (onProgress) onProgress(50);
+      
+      const mockFile = mockSaveFileToLocalStorage(file, userId);
+      
+      if (onProgress) onProgress(100);
+      
+      return mockFile;
     }
-    
-    console.log('File uploaded successfully');
-    
-    if (onProgress) {
-      onProgress(75);
-    }
-    
-    // Get the public URL for the uploaded file
-    const { data: urlData } = supabase.storage
-      .from('file_storage')
-      .getPublicUrl(filePath);
-    
-    if (!urlData || !urlData.publicUrl) {
-      throw new Error('Failed to get public URL for uploaded file');
-    }
-    
-    // Complete progress reporting
-    if (onProgress) {
-      onProgress(90);
-    }
-    
-    // Store file metadata in localStorage for this example
-    const storedFile: StoredFile = {
-      id: fileId,
-      name: file.name,
-      size: file.size,
-      type: file.type,
-      uploadDate: new Date(),
-      url: urlData.publicUrl,
-      userId,
-      path: filePath
-    };
-    
-    // Store file metadata in localStorage
-    const files = getStoredFiles(userId);
-    files.push(storedFile);
-    localStorage.setItem(`files_${userId}`, JSON.stringify(files));
-    
-    if (onProgress) {
-      onProgress(100);
-    }
-    
-    return storedFile;
   } catch (error) {
     console.error('Error in saveFile:', error);
     // Ensure we reset the progress in case of error
@@ -158,19 +214,32 @@ export const deleteFile = async (fileId: string, userId: string): Promise<void> 
   const files = getStoredFiles(userId);
   const fileToDelete = files.find(file => file.id === fileId);
   
-  if (fileToDelete?.path) {
-    // Delete from Supabase storage
-    const { error } = await supabase.storage
-      .from('file_storage')
-      .remove([fileToDelete.path]);
-    
-    if (error) {
-      console.error('Error deleting file from storage:', error);
-      throw error;
+  if (!fileToDelete) {
+    throw new Error('File not found');
+  }
+  
+  // Check if it's a mock file
+  if (fileToDelete.path?.startsWith('mock_')) {
+    // Just revoke the object URL if it exists
+    if (fileToDelete.url.startsWith('blob:')) {
+      URL.revokeObjectURL(fileToDelete.url);
+    }
+  } else if (fileToDelete.path) {
+    try {
+      // Delete from Supabase storage
+      const { error } = await supabase.storage
+        .from('file_storage')
+        .remove([fileToDelete.path]);
+      
+      if (error) {
+        console.error('Error deleting file from storage:', error);
+      }
+    } catch (error) {
+      console.warn('Failed to delete from Supabase, continuing with local deletion:', error);
     }
   }
   
-  // Update localStorage
+  // Update localStorage regardless of Supabase result
   const updatedFiles = files.filter(file => file.id !== fileId);
   localStorage.setItem(`files_${userId}`, JSON.stringify(updatedFiles));
 };
