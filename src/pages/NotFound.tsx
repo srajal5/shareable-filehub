@@ -32,7 +32,7 @@ const NotFound = () => {
             </p>
             <div className="space-y-3">
               <p className="text-sm text-gray-500 mb-4">
-                If you're a developer, make sure the "filestorage" bucket exists in your Supabase project.
+                If you're a developer, make sure the "File Storage" bucket exists in your Supabase project.
               </p>
               <Button asChild className="w-full">
                 <Link to="/dashboard">Return to Dashboard</Link>

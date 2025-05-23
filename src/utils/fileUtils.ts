@@ -3,7 +3,7 @@ import { supabase, checkBucketExists } from '@/integrations/supabase/client';
 import { v4 as uuidv4 } from 'uuid';
 
 // Bucket name
-export const STORAGE_BUCKET = 'filestorage';
+export const STORAGE_BUCKET = 'File Storage';
 
 // Generate a unique ID for files
 export const generateUniqueId = (): string => {
