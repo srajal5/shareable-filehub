@@ -42,7 +42,7 @@ export const getFileTypeIcon = (file: File): string => {
 
 // Generate a sharing URL using Supabase storage URL
 export const generateShareableLink = (filePath: string): string => {
-  const { data } = supabase.storage.from('file_storage').getPublicUrl(filePath);
+  const { data } = supabase.storage.from('filestorage').getPublicUrl(filePath);
   return data.publicUrl;
 };
 
@@ -102,9 +102,9 @@ export const saveFile = async (
     
     try {
       // Check if bucket exists
-      const { error: bucketError } = await supabase.storage.getBucket('file_storage');
+      const { error: bucketError } = await supabase.storage.getBucket('filestorage');
       if (bucketError) {
-        console.warn('Storage bucket "file_storage" not found. Falling back to local storage.');
+        console.warn('Storage bucket "filestorage" not found. Falling back to local storage.');
         if (onProgress) onProgress(50);
         
         // If the bucket doesn't exist, fall back to localStorage
@@ -117,7 +117,7 @@ export const saveFile = async (
       
       // Upload the file
       const { error: uploadError } = await supabase.storage
-        .from('file_storage')
+        .from('filestorage')
         .upload(filePath, file, {
           cacheControl: '3600',
           upsert: false
@@ -136,7 +136,7 @@ export const saveFile = async (
       
       // Get the public URL for the uploaded file
       const { data: urlData } = supabase.storage
-        .from('file_storage')
+        .from('filestorage')
         .getPublicUrl(filePath);
       
       if (!urlData || !urlData.publicUrl) {
@@ -228,7 +228,7 @@ export const deleteFile = async (fileId: string, userId: string): Promise<void> 
     try {
       // Delete from Supabase storage
       const { error } = await supabase.storage
-        .from('file_storage')
+        .from('filestorage')
         .remove([fileToDelete.path]);
       
       if (error) {

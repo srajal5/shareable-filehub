@@ -25,7 +25,7 @@ interface StoredFile {
 
 const Dashboard = () => {
   const { user, isAuthenticated } = useAuth();
-  const [files, setFiles] = useState<StoredFile[]>([]);
+  const [files, setFiles] = useState<any[]>([]);
   const [showUploader, setShowUploader] = useState(false);
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
@@ -49,7 +49,7 @@ const Dashboard = () => {
         .then(bucketExists => {
           if (!bucketExists) {
             toast.warning(
-              "Could not access Supabase storage. Files will be saved locally.",
+              "Could not access Supabase storage bucket named 'filestorage'. Files will be saved locally.",
               { duration: 5000 }
             );
           }

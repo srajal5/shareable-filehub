@@ -20,7 +20,8 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
-    // Dynamically set the redirect URL based on current origin
-    redirectTo: getRedirectURL()
+    // New Supabase JS v2 client uses different auth config structure
+    flowType: 'implicit',
+    detectSessionInUrl: true
   }
 });

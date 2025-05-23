@@ -5,15 +5,15 @@ import { supabase } from '@/integrations/supabase/client';
 export const ensureStorageBucket = async () => {
   try {
     // Check if the bucket exists
-    const { error: checkError } = await supabase.storage.getBucket('file_storage');
+    const { error: checkError } = await supabase.storage.getBucket('filestorage');
     
     if (!checkError) {
-      console.log('Storage bucket "file_storage" exists');
+      console.log('Storage bucket "filestorage" exists');
       return true;
     } else {
       // We can't create buckets with the anon key due to RLS policies
       // Just log this information for debugging purposes
-      console.log('Storage bucket "file_storage" does not exist or not accessible with current permissions');
+      console.log('Storage bucket "filestorage" does not exist or not accessible with current permissions');
       
       // Return false to indicate that bucket operations may not work
       return false;
