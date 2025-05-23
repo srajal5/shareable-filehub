@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/context/AuthContext';
@@ -10,6 +11,8 @@ import { getStoredFiles } from '@/utils/fileUtils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Search, Upload, Grid, List, LayoutGrid, FileText } from 'lucide-react';
+import { toast } from 'sonner';
+import { ensureStorageBucket } from '@/utils/supabaseConfig';
 
 interface StoredFile {
   id: string;
@@ -35,11 +38,28 @@ const Dashboard = () => {
     return <Navigate to="/login" />;
   }
   
-  // Load files on component mount
+  // Load files on component mount and setup storage bucket
   useEffect(() => {
     if (user) {
       const storedFiles = getStoredFiles(user.id);
       setFiles(storedFiles);
+      
+      // Initialize Supabase storage bucket
+      ensureStorageBucket()
+        .then(bucketExists => {
+          if (!bucketExists) {
+            toast.warning(
+              "Could not access Supabase storage. Files will be saved locally.",
+              { duration: 5000 }
+            );
+          }
+        })
+        .catch(() => {
+          toast.warning(
+            "Could not initialize storage. Files will be saved locally.",
+            { duration: 5000 }
+          );
+        });
     }
   }, [user]);
   
