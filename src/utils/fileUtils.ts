@@ -40,10 +40,15 @@ export const getFileTypeIcon = (file: File): string => {
   }
 };
 
-// Generate a sharing URL using Supabase storage URL
+// Generate a sharing URL using Supabase storage URL or fallback to local blob URL
 export const generateShareableLink = (filePath: string): string => {
-  const { data } = supabase.storage.from('filestorage').getPublicUrl(filePath);
-  return data.publicUrl;
+  try {
+    const { data } = supabase.storage.from('filestorage').getPublicUrl(filePath);
+    return data.publicUrl;
+  } catch (error) {
+    console.warn('Could not generate shareable link from Supabase, using local URL');
+    return filePath; // This could be a blob URL if we're in localStorage fallback mode
+  }
 };
 
 // Mock upload to localStorage when Supabase storage fails
@@ -125,7 +130,15 @@ export const saveFile = async (
       
       if (uploadError) {
         console.error('Upload error:', uploadError);
-        throw new Error(`Failed to upload file: ${uploadError.message}`);
+        
+        // Fall back to localStorage on upload error
+        console.warn('Supabase upload failed, falling back to localStorage');
+        if (onProgress) onProgress(50);
+        
+        const mockFile = mockSaveFileToLocalStorage(file, userId);
+        
+        if (onProgress) onProgress(100);
+        return mockFile;
       }
       
       console.log('File uploaded successfully');
