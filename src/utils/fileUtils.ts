@@ -40,45 +40,10 @@ export const getFileTypeIcon = (file: File): string => {
   }
 };
 
-// Generate a sharing URL using Supabase storage URL or fallback to local blob URL
+// Generate a sharing URL using Supabase storage URL
 export const generateShareableLink = (filePath: string): string => {
-  try {
-    const { data } = supabase.storage.from('filestorage').getPublicUrl(filePath);
-    return data.publicUrl;
-  } catch (error) {
-    console.warn('Could not generate shareable link from Supabase, using local URL');
-    return filePath; // This could be a blob URL if we're in localStorage fallback mode
-  }
-};
-
-// Mock upload to localStorage when Supabase storage fails
-const mockSaveFileToLocalStorage = (
-  file: File,
-  userId: string
-): StoredFile => {
-  const fileId = generateUniqueId();
-  
-  // Create a mock URL
-  const mockUrl = URL.createObjectURL(file);
-  
-  // Store file metadata in localStorage
-  const storedFile: StoredFile = {
-    id: fileId,
-    name: file.name,
-    size: file.size,
-    type: file.type,
-    uploadDate: new Date(),
-    url: mockUrl,
-    userId,
-    path: `mock_${userId}/${fileId}`
-  };
-  
-  // Store in localStorage
-  const files = getStoredFiles(userId);
-  files.push(storedFile);
-  localStorage.setItem(`files_${userId}`, JSON.stringify(files));
-  
-  return storedFile;
+  const { data } = supabase.storage.from('file_storage').getPublicUrl(filePath);
+  return data.publicUrl;
 };
 
 // Save a file to Supabase storage with progress tracking
@@ -87,121 +52,53 @@ export const saveFile = async (
   userId: string,
   onProgress?: (progress: number) => void
 ): Promise<StoredFile> => {
-  // Start progress reporting
-  if (onProgress) {
-    onProgress(5); // Initial progress to indicate we've started
-  }
+  const fileId = generateUniqueId();
+  const fileExt = file.name.split('.').pop();
+  const filePath = `${userId}/${fileId}.${fileExt}`;
   
-  try {
-    console.log(`Preparing to upload file: ${file.name} (${file.size} bytes)`);
-    
-    const fileId = generateUniqueId();
-    const fileExt = file.name.split('.').pop();
-    const filePath = `${userId}/${fileId}.${fileExt}`;
-    
-    if (onProgress) {
-      onProgress(15);
-    }
-    
-    console.log(`Uploading file to path: ${filePath}`);
-    
-    try {
-      // Check if bucket exists
-      const { error: bucketError } = await supabase.storage.getBucket('filestorage');
-      if (bucketError) {
-        console.warn('Storage bucket "filestorage" not found. Falling back to local storage.');
-        if (onProgress) onProgress(50);
-        
-        // If the bucket doesn't exist, fall back to localStorage
-        const mockFile = mockSaveFileToLocalStorage(file, userId);
-        
-        if (onProgress) onProgress(100);
-        
-        return mockFile;
+  // Create blob for upload and track progress
+  const fileBlob = file.slice(0, file.size, file.type);
+  
+  // Create and track upload
+  const { error, data } = await supabase.storage
+    .from('file_storage')
+    .upload(filePath, fileBlob, {
+      cacheControl: '3600',
+      upsert: false,
+      onUploadProgress: (progress) => {
+        const progressPercent = (progress.loaded / progress.total) * 100;
+        if (onProgress) {
+          onProgress(progressPercent);
+        }
       }
-      
-      // Upload the file
-      const { error: uploadError } = await supabase.storage
-        .from('filestorage')
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
-      
-      if (uploadError) {
-        console.error('Upload error:', uploadError);
-        
-        // Fall back to localStorage on upload error
-        console.warn('Supabase upload failed, falling back to localStorage');
-        if (onProgress) onProgress(50);
-        
-        const mockFile = mockSaveFileToLocalStorage(file, userId);
-        
-        if (onProgress) onProgress(100);
-        return mockFile;
-      }
-      
-      console.log('File uploaded successfully');
-      
-      if (onProgress) {
-        onProgress(75);
-      }
-      
-      // Get the public URL for the uploaded file
-      const { data: urlData } = supabase.storage
-        .from('filestorage')
-        .getPublicUrl(filePath);
-      
-      if (!urlData || !urlData.publicUrl) {
-        throw new Error('Failed to get public URL for uploaded file');
-      }
-      
-      // Complete progress reporting
-      if (onProgress) {
-        onProgress(90);
-      }
-      
-      // Store file metadata in localStorage for this example
-      const storedFile: StoredFile = {
-        id: fileId,
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        uploadDate: new Date(),
-        url: urlData.publicUrl,
-        userId,
-        path: filePath
-      };
-      
-      // Store file metadata in localStorage
-      const files = getStoredFiles(userId);
-      files.push(storedFile);
-      localStorage.setItem(`files_${userId}`, JSON.stringify(files));
-      
-      if (onProgress) {
-        onProgress(100);
-      }
-      
-      return storedFile;
-    } catch (error) {
-      // If specific Supabase upload fails, fallback to localStorage
-      console.warn('Supabase upload failed, falling back to localStorage:', error);
-      if (onProgress) onProgress(50);
-      
-      const mockFile = mockSaveFileToLocalStorage(file, userId);
-      
-      if (onProgress) onProgress(100);
-      
-      return mockFile;
-    }
-  } catch (error) {
-    console.error('Error in saveFile:', error);
-    // Ensure we reset the progress in case of error
-    if (onProgress) {
-      onProgress(0);
-    }
+    });
+  
+  if (error) {
     throw error;
   }
+  
+  // Get the public URL for the uploaded file
+  const { data: urlData } = supabase.storage.from('file_storage').getPublicUrl(filePath);
+  
+  // Store file metadata in localStorage for this example
+  // In a real app, you might want to store this in a database table
+  const storedFile: StoredFile = {
+    id: fileId,
+    name: file.name,
+    size: file.size,
+    type: file.type,
+    uploadDate: new Date(),
+    url: urlData.publicUrl,
+    userId,
+    path: filePath
+  };
+  
+  // Store file metadata in localStorage (for compatibility with existing code)
+  const files = getStoredFiles(userId);
+  files.push(storedFile);
+  localStorage.setItem(`files_${userId}`, JSON.stringify(files));
+  
+  return storedFile;
 };
 
 // Interface for stored file metadata
@@ -227,32 +124,18 @@ export const deleteFile = async (fileId: string, userId: string): Promise<void> 
   const files = getStoredFiles(userId);
   const fileToDelete = files.find(file => file.id === fileId);
   
-  if (!fileToDelete) {
-    throw new Error('File not found');
-  }
-  
-  // Check if it's a mock file
-  if (fileToDelete.path?.startsWith('mock_')) {
-    // Just revoke the object URL if it exists
-    if (fileToDelete.url.startsWith('blob:')) {
-      URL.revokeObjectURL(fileToDelete.url);
-    }
-  } else if (fileToDelete.path) {
-    try {
-      // Delete from Supabase storage
-      const { error } = await supabase.storage
-        .from('filestorage')
-        .remove([fileToDelete.path]);
-      
-      if (error) {
-        console.error('Error deleting file from storage:', error);
-      }
-    } catch (error) {
-      console.warn('Failed to delete from Supabase, continuing with local deletion:', error);
+  if (fileToDelete?.path) {
+    // Delete from Supabase storage
+    const { error } = await supabase.storage
+      .from('file_storage')
+      .remove([fileToDelete.path]);
+    
+    if (error) {
+      throw error;
     }
   }
   
-  // Update localStorage regardless of Supabase result
+  // Update localStorage
   const updatedFiles = files.filter(file => file.id !== fileId);
   localStorage.setItem(`files_${userId}`, JSON.stringify(updatedFiles));
 };
